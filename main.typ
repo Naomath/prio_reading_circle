@@ -13,7 +13,7 @@
   subslide-numbering: "(i)",
 )
 
-#set text(size: 12pt)
+#set text(size: 11pt)
 #let blink(x, y) = text(blue, link(x, y))
 #let otheorem(x) = theorem(x, fill-header: orange.lighten(65%))
 
@@ -52,7 +52,6 @@ Mainly, three techniques are known for secure computation:
 #v(0.3em)
 
 === Homomorphic Encryption
-#set text(size: 12pt)
 
 #let Enc = math.op("Enc")
 
@@ -282,19 +281,18 @@ $ a = a_1 + a_2 + dots.c + a_n $
 $ b = b_1 + b_2 + dots.c + b_n $
 
 $ c = c_1 + c_2 + dots.c + c_n $
-
 Each participant $i$ holds the shares $(a_i, b_i, c_i)$.
 The triple is generated during a preprocessing phase and is independent
 of the secrets that will later be multiplied.
-==== Goal
+
+*Goal*
 Suppose two secrets $x = x_1 + x_2 + dots.c + x_n $ and
 $y = y_1 + y_2 + dots.c + y_n $
 are shared among the participants.
-The goal is to obtain shares of the product
+The goal is to obtain shares of the product $x y $ without revealing $x$ or $y$.
 
-$ x y $
-
-without revealing $x$ or $y$.
+#pagebreak()
+#set page(columns: 2)
 
 ==== Step 1: Mask the Secrets
 
@@ -306,9 +304,9 @@ $ e_i = y_i - b_i $
 
 Then the parties reconstruct the public values
 
-$ d = sum_i d_i = x - a $
-
-$ e = sum_i e_i = y - b $.
+$ d = sum_i d_i = x - a \
+e = sum_i e_i = y - b
+$
 
 Since $a$ and $b$ are random and unknown to the parties,
 revealing $d$ and $e$ does not leak information about $x$ or $y$.
@@ -321,7 +319,7 @@ $ x y = (a + d)(b + e) $
 
 we expand
 
-$ x y = a b + d b + e a + d e $.
+$ x y = a b + d b + e a + d e $
 
 Because $c = a b$, we can rewrite this as
 
@@ -330,6 +328,9 @@ $ x y = c + d b + e a + d e $
 Each participant then computes a share of the product as
 
 $ z_i = c_i + d b_i + e a_i $
+
+#pagebreak()
+#set page(columns: 1)
 
 and one designated participant (or all parties with a correction term)
 adds the public value $d e$ so that
@@ -344,14 +345,118 @@ represent the secret
 
 $ x y $ without revealing any information about $x$ or $y$ to the parties.
 
-== Where to em
+== Where to use MPC?
+#v(0.3em)
+#grid(
+  columns: (1fr, 1fr),
+  gutter: 10pt,
+  box(
+    stroke: 1pt,
+    inset: 10pt,
+    [
+      *Privacy-preserving Medical Research*
+      
+      Hospitals can jointly analyze patient datasets (e.g., cancer or COVID-19 statistics) using MPC so that sensitive patient records remain inside each institution.
+    ]
+  ),
+  box(
+    stroke: 1pt,
+    inset: 10pt,
+    [
+      *Secure National Statistics*
+      
+      National statistics agencies such as *Statistics Denmark* have explored MPC to compute aggregate economic statistics from multiple companies while keeping each company's data confidential.
+    ]
+  ),
+)
 
+== MPC for Privacy-Preserving Measurement
+
+Modern Internet services often require large-scale measurements in order to improve systems, train machine learning models, or understand software reliability. However, collecting raw user data can create serious privacy risks. Many measurements—such as browser crash statistics, keyboard prediction training data, or health exposure notifications—require aggregated statistics rather than individual user data.
+
+To address this challenge, the Internet Engineering Task Force (IETF) established the *Privacy Preserving Measurement (PPM) Working Group*. The goal of this working group is to design standardized protocols that enable useful data collection while minimizing the exposure of information about individual users.
+
+The central protocol developed in this effort is the *Distributed Aggregation Protocol (DAP)*.
+
+== Privacy Preserving Measurement (PPM) Working Group
+PPM is a framework that allows organizations to compute *aggregate statistics*
+from sensitive user data *without revealing individual measurements*.
+
+#columns(2,[
+  === Motivation
+
+  - Many measurements involve *sensitive data*
+  - Example:
+    - Browser vendors measuring rendering errors
+    - Public health agencies measuring disease exposure
+  - Traditional approach:
+    - Collect individual data in plaintext
+    - Aggregate afterward  
+  → *Risk of privacy leakage*
+
+  #v(8pt)
+
+  === Key Idea
+  - Clients send encrypted / secret-shared measurements
+  - One or more *non-colluding servers* process the data
+  - Only *aggregate statistics* are revealed
+
+  Examples of supported statistics:
+
+  - Average values  
+  - Frequency / counts of events
+])
+
+
+
+#v(8pt)
+
+=== PPM Protocol Goals
+
+- Secure client submission of measurements
+- Verification of measurement validity
+- Privacy-preserving computation of aggregates
+- Protection against abuse
+  - leakage of individual measurements
+  - denial-of-service attacks
+
+#v(6pt)
+
+PPM protocols rely on cryptographic primitives defined by the CFRG and
+are being standardized by the IETF PPM Working Group.
+
+The *Distributed Aggregation Protocol (DAP)* is the primary protocol developed by the PPM working group to enable privacy-preserving data aggregation. It applies techniques from *multi-party computation (MPC)* by splitting each client’s measurement into cryptographic shares processed by multiple non-colluding aggregators, ensuring that only the final aggregate result is revealed while individual measurements remain hidden.
 
 = Overview: Prio
-== Overview of the paper
+== Overview of the paper 
 
-Title: Prio: Private, Robust, and Scalable Computation of Aggregate Statistics
+Title & Authors: "Prio: Private, Robust, and Scalable Computation of Aggregate Statistics", Henry Corrigan-Gibbs and Dan Boneh 
 
-Authors: Henry Corrigan-Gibbs and Dan Boneh
+Position: *A milestone paper in DAP's history*
 
-Publication: USENIX Symposium on Networked Systems Design and Implementation 2017
+#set text(size:8pt)
+#figure(
+
+  table(
+    columns: 4,
+    stroke: 0.5pt,
+    align: center,
+
+    [], [Privacy], [Scalability], [Robustness],
+
+    [MPC traditional protocol (SPDZ,BGW)], [⭕️], [computation is heavy],[⭕️],
+    [Differential Privacy (RAPPOR)], [noisy], [⭕️],[❌
+    #footnote[PKI is a solution for verifying clients, not clients' inputs.
+Thus, combining PKI with a non-robust protocol such as RAPPOR does not achieve robustness.]],
+    [*Prio*], [⭕️], [⭕️], [⭕️],
+  ),
+  caption: [Comparison of Prio with Traditional MPC and Differential Privacy],
+)
+#set text(size: 11pt)
+
+#definition(title: "Robustness")[
+  A protocol is robust if malicious clients cannot significantly bias the aggregated result beyond their proportional contribution.
+]
+
+#pagebreak()
+=== Contributions 
