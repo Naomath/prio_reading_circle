@@ -142,8 +142,9 @@ where the coefficients $a_1, dots.c, a_(t-1)$ are chosen uniformly at random fro
 To reconstruct the secret, any set of at least $t$ parties combines their shares and uses Lagrange interpolation to recover $f(0)$, which equals the secret $s$. 
 
 Security follows from the fact that *with fewer than $t$ points, the polynomial is underdetermined*: infinitely many degree-$(t-1)$ polynomials match those points.
+#pagebreak()
+#set page(columns: 2)
 === Example of Shamir's Secret Sharing
-#set text(size: 11pt)
 We build a $(t, n) = (3, 5)$ Shamir secret sharing scheme over the finite field $FF_(17)$. Let the secret be $s = 5$ and choose a random degree-2 polynomial
 
 $ f(x) = s + a_1 x + a_2 x^2 quad (mod 17) $
@@ -155,9 +156,8 @@ f(x) = 5 + 2x + 7x^2 quad (mod 17)
 $
 
 ==== Step 1: Share generation
-
 We pick distinct nonzero $x$ values and compute $y_i = f(x_i)$.
-
+#v(2em)
 #table(
   columns: 2,
   [$(x_i, f(x_i))$], [value in $FF_(17)$],
@@ -195,11 +195,15 @@ Compute the basis values at $x=0$:
 
 So,
 
-$ f(0) equiv 14 dot 3 + 3 dot 14 + 6 dot 1= 42 + 42 + 6 = 90 equiv 5 quad (mod 17). $
+$ 
+ f(0) equiv 14 dot 3 + 3 dot 14 + 6 dot 1 \
+ = 42 + 42 + 6 = 90 equiv 5 quad (mod 17)
+$
 
 Therefore the reconstructed secret is $s = f(0) = 5$.
 
 #pagebreak()
+#set page(columns: 1)
 === ADD computation
 Assume two secrets $s_1, s_2 in FF_p$ are shared by
 polynomials $f_1(x)$ and $f_2(x)$ of degree at most $(t-1)$.
@@ -427,8 +431,8 @@ are being standardized by the IETF PPM Working Group.
 
 The *Distributed Aggregation Protocol (DAP)* is the primary protocol developed by the PPM working group to enable privacy-preserving data aggregation. It applies techniques from *multi-party computation (MPC)* by splitting each client’s measurement into cryptographic shares processed by multiple non-colluding aggregators, ensuring that only the final aggregate result is revealed while individual measurements remain hidden.
 
-= Overview: Prio
-== Overview of the paper 
+= Prio
+== Paper Overview
 
 Title & Authors: "Prio: Private, Robust, and Scalable Computation of Aggregate Statistics", Henry Corrigan-Gibbs and Dan Boneh 
 
@@ -458,5 +462,204 @@ Thus, combining PKI with a non-robust protocol such as RAPPOR does not achieve r
   A protocol is robust if malicious clients cannot significantly bias the aggregated result beyond their proportional contribution.
 ]
 
+== Whye robustness is needed?
+
+In privacy-preserving measurement systems, servers aggregate client data without seeing individual values. Because of this, malicious clients may try to send *invalid or malformed inputs* that could distort the aggregated result.
+
+For example, in a system that collects car speeds, a malicious client might submit an impossible value such as *100,000 km/h*, even though the valid range is between *0 and 200 km/h*. If such inputs are accepted, they can significantly bias the statistics.
+
+Robustness is therefore needed to ensure that servers can detect and reject syntactically invalid submissions while preserving privacy. This prevents attackers from corrupting the aggregation with out-of-range or malformed data.
+
+However, robustness does *not guarantee truthfulness*. A malicious client may still submit an incorrect but valid value (e.g., reporting 100 km/h instead of the actual 80 km/h).
+
+== Contributions 
+
+- introduce secret-shared non-interactive proofs (SNIPs), a new type of information-theoretic zero-knowledge proof, optimized for the client/server setting, (*Robustness*)
+
+- present affine-aggregatable encodings, a frameworkthat unifies many data-encoding techniques used in prior work on private aggregation, and
+
+- demonstrate how to combine these encodings with SNIPs to provide robustness and privacy in a largescale data-collection system. (*Scalability*)
+
+*It can be said that Prio's main contribution is the design of SNIPs, which balances the trade-off between robustness and scalability in the context of privacy-preserving measurement.*
+
+== Simple Architecture
+Simple additive secret sharing-based protocol for computing the sum of client inputs.
+
+#align(center, image("figs/prio_simple.jpg", height: 70%))
+
+However, this simple architecture is not robust.
+--> *SNIP*
+
+And, we need more complex statistics than just sums.
+--> *Affine-aggregatable encodings*
+
+= SNIP
+== Arithmetic Circuits
+
+An arithmetic circuit $C$ over a finite field $FF$ takes as input a vector
+$ x = angle.l x^((1)), dots, x^((L)) angle.r in FF^L $
+and produces a single field element as output.
+
+The circuit is represented as a directed acyclic graph (DAG). Each vertex in the graph is one of the following:
+- Input vertex
+- Gate vertex  
+- Output vertex
+
+*Input Vertices*
+
+Input vertices have in-degree 0 and are labeled with either:
+- a variable in ${x^((1)), dots, x^((L))}$, or
+- a constant in $FF$.
 #pagebreak()
-=== Contributions 
+*Gate Vertices*
+
+Gate vertices have in-degree 2 and are labeled with one of the operations:
+- $+$ (addition)
+- $times$ (multiplication)
+
+*Output Vertex*: 
+The circuit has a single output vertex, which has out-degree 0.
+
+*Example*
+This circuit computes the function:
+$
+  C(x) = 1 - (x - 0)(x - 1)(x - 2)(x - 3)
+$
+It verfies that the input $x$ is in the set ${0, 1, 2, 3}$.
+#align(center, image("figs/arithmetic_circuit.png", height: 30%))
+
+== Setting and Goal
+
+=== Setting
+
+We want to verify a client input on an *arithmetic circuit*.
+
+Multiplication gates of the circuit are ordered topologically: $t = 1, 2, dots, M $
+
+For each gate we denote:
+- left input: $u_t$
+- right input: $v_t$
+- output: $w_t$
+
+Correct computation satisfies: $w_t = u_t v_t $
+
+The client input $x$ is secret-shared among the servers.
+
+Servers hold: $[x]_1, [x]_2, dots, [x]_s$
+=== Goal
+Verify that $"Valid"(x) = 1 $ *without revealing $x$.*
+
+
+== Step 1: Polynomial Encoding of the Circuit
+
+The client evaluates the arithmetic circuit locally. 
+Using interpolation the client constructs polynomials
+$
+f(t) = u_t \
+g(t) = v_t
+$
+and
+$ h(t) = f(t) g(t) $
+
+$f(0), g(0)$ are determined randomly over $FF$ by the client. 
+
+$f,g$ are random polynomials of degree at most $M$ that pass through the points $(t, u_t)$ and $(t, v_t)$ for $t = 1, dots, M$. 
+
+$h$ is a random polynomial of degree at most $2M$ that passes through the points $(t, w_t)$ for $t = 1, dots, M$. 
+
+#pagebreak()
+
+=== What the Client Sends
+  
+The client *secret-shares* the following values to the servers:
+- share of $x$
+- shares of $f(0)$
+- shares of $g(0)$
+- shares of the coefficients of $h(t)$
+- shares of a Beaver triple $(a, b, c)$ with $a b = c$
+
+Each server $i$ receives
+$ [x]_i, quad [f(0)]_i, quad [g(0)]_i, quad [h]_i, quad [a]_i, quad [b]_i, quad [c]_i $
+
+No single server learns the actual values.
+
+== Step 2: Reconstruction by the Servers
+
+Using
+- the circuit structure
+- the shares of the coefficients of $h(t)$ 
+- the shares of $f(0)$ and $g(0)$
+- the share of $x$
+
+each server locally reconstructs shares of the polynomials
+$ [hat(f)]_i, quad [hat(g)]_i $
+
+The servers now collectively hold shares of
+$ hat(f), quad hat(g), quad hat(h) $
+
+These represent the client's claimed computation.
+
+== Step 3: Checking the Polynomial Relation
+Servers must verify
+$ hat(f)(t) hat(g)(t) = hat(h)(t) $
+for all $t$.
+
+Instead of checking all points, they perform a randomized identity test.
+
+A server samples $r in bb(F)$ and broadcasts $r$ to the others.
+
+Each server locally computes
+$ [hat(f)(r)]_i, quad [hat(g)(r)]_i, quad [hat(h)(r)]_i $
+
+=== Secure Multiplication
+
+The values $[hat(f)(r)]$ and $[hat(g)(r)]$ are secret-shared.
+
+Servers compute the product using the Beaver triple $(a, b, c)$ with $a b = c$.
+
+Each server broadcasts small masked values (as in Beaver's protocol).
+
+From this interaction the servers obtain shares of
+$ [hat(f)(r) hat(g)(r)] $
+
+Finally they open
+$ sigma = hat(f)(r) hat(g)(r) - hat(h)(r) $
+
+If $sigma = 0$, the check passes.
+
+== If a Client Cheats
+
+Suppose the client falsifies a gate output $hat(w)_t != u_t v_t $
+
+Define the *first incorrect gate*
+$ t_0 = min { t mid hat(w)_t != u_t v_t } $
+
+For all earlier gates the computation is correct.
+
+Therefore the reconstructed polynomials satisfy
+$ 
+hat(f)(t_0) = u_(t_0)\
+hat(g)(t_0) = v_(t_0) $
+
+But the client submitted $hat(h)(t_0) = hat(w)_(t_0)$ so
+$ hat(f)(t_0) hat(g)(t_0) != hat(h)(t_0) $
+and thus $f g != h$
+
+== Randomized Detection
+
+Servers evaluate the identity at a random point $r in bb(F)$
+
+Define the polynomial
+$ D(t) = hat(f)(t) hat(g)(t) - hat(h)(t) $
+
+If the client cheated then
+$ D(r) = 0 $
+only with probability
+$ <= (2M) / (|bb(F)|) $
+by the *Schwartz–Zippel lemma*.
+Thus cheating is detected with overwhelming probability.
+
+=== Key Insight
+SNIPs reduce *circuit verification* to *a single randomized polynomial identity check.*
+
+
