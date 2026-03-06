@@ -51,7 +51,7 @@ Mainly, three techniques are known for secure computation:
 #pagebreak()
 #v(0.3em)
 
-=== Homomorphic Encryption
+=== 1. Homomorphic Encryption
 
 #let Enc = math.op("Enc")
 
@@ -80,7 +80,7 @@ $
 #pagebreak()
 #v(0.3em)
 
-=== Trusted Execution Environment (TEE)
+=== 2. Trusted Execution Environment (TEE)
 Trusted Execution Environment (TEE) is a *hardware support* that provides an isolated environment for executing code and processing data.
 TEE is employed in various applications, such as managing secure keys, mobile payments, and biometric authentication.
 
@@ -90,7 +90,7 @@ SORRY for a little content here.....
 
 #pagebreak()
 #v(0.3em)
-=== Multi-Party Computation
+=== 3. Multi-Party Computation
 Secure Multi-Party Computation (MPC) allows multiple parties to *jointly compute* a function over their inputs
 while keeping those inputs private.
 
@@ -351,28 +351,22 @@ $ x y $ without revealing any information about $x$ or $y$ to the parties.
 
 == Where to use MPC?
 #v(0.3em)
-#grid(
-  columns: (1fr, 1fr),
-  gutter: 10pt,
-  box(
-    stroke: 1pt,
-    inset: 10pt,
-    [
-      *Privacy-preserving Medical Research*
-      
-      Hospitals can jointly analyze patient datasets (e.g., cancer or COVID-19 statistics) using MPC so that sensitive patient records remain inside each institution.
-    ]
-  ),
-  box(
-    stroke: 1pt,
-    inset: 10pt,
-    [
-      *Secure National Statistics*
-      
-      National statistics agencies such as *Statistics Denmark* have explored MPC to compute aggregate economic statistics from multiple companies while keeping each company's data confidential.
-    ]
-  ),
-)
+#columns(2,[
+    *Privacy-preserving Medical Research*
+    
+    Hospitals can jointly analyze patient datasets (e.g., cancer or COVID-19 statistics) using MPC so that sensitive patient records remain inside each institution. MPC enables researchers to compute aggregate statistics or train machine learning models on distributed data without moving hospitals' data outside their institutions.
+
+    Example: Kidney Exchange Program#footnote[https://link.springer.com/article/10.1186/s12911-022-01994-4] 
+
+    #colbreak()
+    *Privacy-preserving Auctions*
+
+    Organizations can conduct auctions where participants’ bids remain confidential while still determining the correct market outcome. Using MPC, bidders submit encrypted bids, and the system computes the auction result (such as the winning bidder or market-clearing price) without revealing individual bids. This removes the need for a trusted auctioneer and ensures fairness while protecting sensitive business information.
+
+    Example: Danish Sugar Beet Auction#footnote[https://www.partisia.com/blog/worlds-first-commercial-use-of-multi-party-computation-mpc
+]
+
+])
 
 == MPC for Privacy-Preserving Measurement
 
@@ -450,7 +444,7 @@ Position: *A milestone paper in DAP's history*
 
     [MPC traditional protocol (SPDZ,BGW)], [⭕️], [computation is heavy],[⭕️],
     [Differential Privacy (RAPPOR)], [noisy], [⭕️],[❌
-    #footnote[PKI is a solution for verifying clients, not clients' inputs.
+    #footnote[PKI is a solution for verifying clients' identities, not clients' inputs.
 Thus, combining PKI with a non-robust protocol such as RAPPOR does not achieve robustness.]],
     [*Prio*], [⭕️], [⭕️], [⭕️],
   ),
@@ -497,7 +491,7 @@ And, we need more complex statistics than just sums.
 == Arithmetic Circuits
 
 An arithmetic circuit $C$ over a finite field $FF$ takes as input a vector
-$ x = angle.l x^((1)), dots, x^((L)) angle.r in FF^L $
+$ x = chevron.l x^((1)), dots, x^((L)) chevron.r in FF^L $
 and produces a single field element as output.
 
 The circuit is represented as a directed acyclic graph (DAG). Each vertex in the graph is one of the following:
@@ -591,7 +585,7 @@ Using
 - the shares of $f(0)$ and $g(0)$
 - the share of $x$
 
-each server locally reconstructs shares of the polynomials
+Tracing the circuit with these shares, each server locally reconstructs shares of the polynomials
 $ [hat(f)]_i, quad [hat(g)]_i $
 
 The servers now collectively hold shares of
@@ -662,4 +656,149 @@ Thus cheating is detected with overwhelming probability.
 === Key Insight
 SNIPs reduce *circuit verification* to *a single randomized polynomial identity check.*
 
+= Affine-Aggregatable Encodings (AFEs)
 
+== Setting and Goal
+
+We already know how to calculate the sum of client inputs with Prio. BUT,....
+
+*The fundamental challenge*: \
+Most useful statistics are *not* simple sums. How can we compute complex aggregation functions like:
+
+- Frequency histograms (requires counting occurrences)
+- Linear regression (requires sums of products)
+- Maximum/minimum values
+=== The AFE Solution
+
+Affine-Aggregatable Encodings (AFEs) provide a framework where:
++ Each client *encodes* its private value $x_i$ into a specially designed vector
++ Servers compute the *sum* of these encoded vectors (compatible with secret sharing)
++ Servers *decode* the summed encoding to recover $f(x_1, dots, x_n)$
+
+By cleverly encoding data, we can *reduce complex aggregation functions to simple summation*. 
+
+#set page(columns: 2)
+== AFE Definition and Computable Functions
+
+=== Formal Definition
+
+An AFE is defined with respect to:
+- A finite field $bb(F)$
+- Integers $k, k' in bb(N)$ where $k' lt.eq k$
+- Data domain $cal(D)$ and aggregate range $cal(A)$
+- Aggregation function $f: cal(D)^n arrow cal(A)$
+
+An AFE consists of three algorithms:
+
+*Encode*: $cal(D) arrow bb(F)^k$
+- Maps a data value to its encoding
+
+*Valid*: $bb(F)^k arrow {0,1}$
+- Returns 1 if the input is a valid encoding of some $x in cal(D)$
+- Can be represented as an arithmetic circuit
+
+*Decode*: $bb(F)^(k') arrow cal(A)$
+- Takes $sigma = sum_(i=1)^n "Trunc"_(k') ("Encode"(x_i))$
+- Outputs $f(x_1, dots, x_n)$
+
+Note: Encoding uses all $k$ components for validation, but only $k'$ components are needed for decoding.
+
+=== Security Properties
+
+*Correctness*: For all $(x_1, dots, x_n) in cal(D)^n$:
+$ "Decode"(sum_(i=1)^n "Trunc"_(k') ("Encode"(x_i))) = f(x_1, dots, x_n) $
+
+*Soundness*: $"Valid"(e) = 1 <==> exists x in cal(D): e = "Encode"(x)$
+
+
+=== Catalog of Computable Functions
+
+Prio supports AFEs for:
+
+*Basic statistics*:
+- Integer sum, mean, product, geometric mean
+- Variance and standard deviation
+- Min and max (exact for small ranges, approximate for large)
+
+*Boolean operations*:
+- OR and AND (with high probability)
+
+*Frequency analysis*:
+- Frequency counts over small domains
+- Approximate counts using count-min sketches
+
+*Set operations*:
+- Set intersection and union
+
+*Machine learning*:
+- Linear regression (arbitrary dimensions)
+- Least-squares fitting
+- Model evaluation ($R^2$ coefficient)
+
+Combining these AFEs allows Prio to compute a wide range of aggregate statistics.
+
+#set page(columns: 1)
+== Example 1: b-bit Integer Summation
+
+=== Construction
+
+Let each client hold an integer $0 lt.eq x lt.eq 2^b - 1$. We work over a finite field $bb(F)$ with $|bb(F)| gt.eq n dot 2^b$ to prevent overflow.
+
+*Encoding*: For input $x$, compute binary representation $(beta_0, beta_1, dots, beta_(b-1)) in {0,1}^b$ where $x = sum_(i=0)^(b-1) 2^i beta_i$. Output:
+$ "Encode"(x) = (x, beta_0, beta_1, dots, beta_(b-1)) in bb(F)^(b+1) $
+
+*Validation*: The arithmetic circuit checks two properties:
++ *Bit constraints*: Each $beta_i$ is binary: $beta_i (1 - beta_i) = 0$ for all $i$
++ *Consistency*: The bits represent $x$: $x = sum_(i=0)^(b-1) 2^i beta_i$
+
+This requires exactly $b$ multiplication gates (one per bit check).
+
+*Decoding*: Given $sigma = sum_(i=1)^n "Trunc"_1 ("Encode"(x_i)) = sum_(i=1)^n x_i$, output $sigma$.
+
+=== Extensions
+
+*Mean*: Compute sum, then divide by $n$ over the rationals.
+
+*Product/Geometric mean*: Instead of encoding $x$ directly, encode $log_2(x)$ using $b$-bit representation. The sum of logs gives the log of the product.
+
+*Variance*: Use the identity $"Var"(X) = bb(E)[X^2] - (bb(E)[X])^2$. Each client encodes $(x, x^2)$ 
+and validates both the bit representations and that the second component is indeed the square of the first. 
+Decode to get both sum and sum-of-squares, then compute variance. 
+
+== Example 2: Frequency Counts
+
+=== Problem Statement
+
+Each client holds a value $x in cal(D) = {0, 1, dots, B-1}$ (small discrete domain). The goal is to output a histogram: a length-$B$ vector $bold(v)$ where $v[j]$ counts how many clients have value $j$.
+
+This goes beyond simple summation—we need to *count occurrences* of each possible value in the domain.
+
+=== Construction
+
+Work over field $bb(F)$ with $|bb(F)| gt.eq n$.
+
+*Encoding*: For input $x in {0, dots, B-1}$, create a one-hot vector:
+$ "Encode"(x) = (beta_0, beta_1, dots, beta_(B-1)) in bb(F)^B $
+where $beta_i = 1$ if $x = i$, and $beta_i = 0$ otherwise.
+
+*Validation*: The circuit checks:
++ *Bit constraints*: $beta_i (1 - beta_i) = 0$ for all $i$ (each component is binary)
++ *One-hot constraint*: $sum_(i=0)^(B-1) beta_i = 1$ (exactly one bit is set)
+
+This requires $B$ multiplication gates for the bit checks. The sum can be checked with a linear constraint (no multiplications needed).
+
+*Decoding*: Given $sigma = sum_(i=1)^n "Encode"(x_i)$, simply output $sigma$. The $j$-th component equals:
+$ sigma[j] = sum_(i=1)^n beta_(i,j) = |{i : x_i = j}| $
+which is exactly the count of clients with value $j$.
+
+=== Why One-Hot Constraint Works with Secret Sharing
+
+A crucial question: how can servers verify the one-hot constraint $sum_(i=0)^(B-1) beta_i = 1$ when each server only sees shares of the encoding?
+
+--> The one-hot constraint is a *linear equation*, which is preserved under secret sharing
+
+= Discussion
+== My Thoughts
+- Prio presented several use cases of MPC. One key point emphasized is that distributing the computation across multiple servers helps *reduce the risk of privacy leakage* caused by hacking or data breaches. While a strength of Prio is the absence of a central registry, similar to the debates around Web3, it is worth considering *how realistic the assumption is that trusting a central registry is inherently dangerous*.
+
+- Differential privacy provides privacy guarantees only in a probabilistic sense. Therefore, if strict correctness of the computed values is required, MPC may be preferable. However, from a computational perspective, differential privacy is significantly more efficient, so the choice between the two should depend on the requirements of the system being built.
